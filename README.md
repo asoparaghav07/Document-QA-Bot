@@ -51,10 +51,12 @@ Follow these steps to get the project running locally:
 ### Prerequisites
 Make sure you have **Python 3.9+** installed on your system.
 
-### Step 1: Clone or Navigate to the Directory
-Go into the project folder:
+### Step 1: Clone the Repository
+
+Clone the project to your local machine and navigate into the directory:
 ```bash
-cd "/home/raghav/Desktop/Document Q&A Bot"
+git clone https://github.com/asoparaghav07/Document-QA-Bot.git
+cd Document-QA-Bot
 ```
 
 ### Step 2: Set up a Virtual Environment (Recommended)
