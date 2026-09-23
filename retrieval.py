@@ -1,12 +1,18 @@
+from dotenv import load_dotenv
+import chromadb
 import os
 import time
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+from ingest import get_embedding_model
+
+# Load environment variables from .env file so retrieval.py works standalone
+load_dotenv()
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import SystemMessage, HumanMessage
 
-def load_vector_store(db_directory: str = "./chroma_db"):
+def load_vector_store(db_directory: str = "./chroma_db", embeddings=None):
     """
     Loads the persisted Chroma vector database from disk.
     
@@ -17,9 +23,12 @@ def load_vector_store(db_directory: str = "./chroma_db"):
     if not os.path.exists(db_directory):
         return None
         
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    if embeddings is None:
+        embeddings = get_embedding_model()
+    client = chromadb.PersistentClient(path=db_directory)
     vector_store = Chroma(
-        persist_directory=db_directory,
+        client=client,
+        collection_name="langchain",
         embedding_function=embeddings
     )
     return vector_store

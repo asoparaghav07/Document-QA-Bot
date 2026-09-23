@@ -3,8 +3,23 @@ import os
 import shutil
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
+import streamlit as st
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+
+@st.cache_resource(show_spinner="Loading embedding model into memory...")
+def get_embedding_model():
+    """
+    Caches the local embedding model in memory across Streamlit runs and sessions.
+    Prevents repeated 5-15 second reloading overhead and HF Hub rate-limit warnings.
+    """
+    try:
+        return HuggingFaceEmbeddings(
+            model_name="all-MiniLM-L6-v2",
+            model_kwargs={"local_files_only": True}
+        )
+    except Exception:
+        return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 def extract_text_and_split(pdf_file_path: str):
     """
@@ -60,7 +75,7 @@ def extract_text_and_split(pdf_file_path: str):
     return chunks, full_text
 
 
-def create_vector_store(chunks, db_directory: str = "./chroma_db"):
+def create_vector_store(chunks, db_directory: str = "./chroma_db", embeddings=None):
     """
     Step 3: Convert text chunks into vector embeddings and store them in a local ChromaDB database.
     
@@ -79,10 +94,9 @@ def create_vector_store(chunks, db_directory: str = "./chroma_db"):
     their numerical embeddings. This allows us to perform "Similarity Search", finding chunks 
     that mean something similar to a user's question, even if they use completely different words!
     """
-    # 1. Initialize the embedding model. This will download the model (~90MB) on first run
-    # and run it locally on your CPU/GPU for subsequent runs.
-    print("Initializing embedding model (all-MiniLM-L6-v2)...")
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    # 1. Fetch the cached embedding model
+    if embeddings is None:
+        embeddings = get_embedding_model()
     
     # 2. Clean up any existing vector store collection to prevent SQLite file locks
     import chromadb

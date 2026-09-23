@@ -6,3 +6,5 @@ chromadb>=0.4.22
 sentence-transformers>=2.3.0
 pypdf>=4.0.0
 python-dotenv>=1.0.0
+langchain-huggingface
+langchain-chroma
