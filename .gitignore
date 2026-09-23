@@ -4,3 +4,7 @@ chroma_db/
 temp_uploads/
 __pycache__/
 *.pyc
+*.db
+storage.db
+.streamlit/secrets.toml
+!.streamlit/secrets.toml.example
