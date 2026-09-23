@@ -130,6 +130,7 @@ with st.sidebar:
                     st.session_state.solved_results = None
                     # Clear chat history for the previous document
                     st.session_state.messages = []
+                    status_placeholder.empty()
                     st.success("✅ Ingestion complete! Ask questions on the right.")
                     
                 except Exception as e:
@@ -253,6 +254,13 @@ else:
         if vector_store is None:
             st.error("Vector database is not loaded. Please upload a document first.")
         else:
+            manual_q = st.text_area("Add custom question manually:", placeholder="Type a question to solve...")
+            if st.button("➕ Add Manual Question"):
+                if not manual_q.strip():
+                    st.warning("Please enter at least one question into the text area above.")
+                else:
+                    st.session_state.detected_questions = st.session_state.get("detected_questions", [])
+                    st.session_state.detected_questions.append({"number": len(st.session_state.detected_questions) + 1, "question_text": manual_q.strip()})
             if st.session_state.solved_results is None:
                 if st.button("📝 Start Solving Document", use_container_width=True):
                     if not st.session_state.full_document_text:

@@ -19,22 +19,30 @@ def split_into_questions(full_document_text: str) -> list[dict]:
         return []
         
     # Pattern to detect numbered questions:
-    # - (?:^|\n): Start of the text or start of a new line
+    # - (?:^|
+): Start of the text or start of a new line
     # - \s*: Optional leading whitespace
-    # - (?:[Qq]uestion|[Qq])?\s*: Optional "Question" or "Q" (case-insensitive) followed by optional spaces
-    # - (\d+): One or more digits (captured as group 1)
-    # - [\.\):-]: Punctuation separating number from question (e.g., '.', ')', ':', '-')
-    # - \s+: Required whitespace following the separator
-    pattern = re.compile(r'(?:^|\n)\s*(?:[Qq]uestion|[Qq])?\s*(\d+)[\.\):-]\s+')
+    # - Group 1: Entire prefix including optional question keyword and number
+    # - Group 2: The question digits
+    pattern = re.compile(r'(?:^|\n)\s*((?:[Qq]uestion|[Qq])?\s*(\d+)[\.\):-]\s+)')
     
     matches = list(pattern.finditer(full_document_text))
     if not matches:
         return []
         
+    # List of common worksheet-style imperative verbs
+    imperative_pattern = re.compile(
+        r'^\s*(?:Name|List|Describe|Explain|Identify|Define|Calculate|State|Give|Compare)\b',
+        re.IGNORECASE
+    )
+
     questions = []
     for i, match in enumerate(matches):
-        q_num = int(match.group(1))
+        matched_prefix = match.group(1)
+        q_num = int(match.group(2))
+        has_keyword = bool(re.search(r'^(?:[Qq]uestion|[Qq])\b', matched_prefix.strip(), re.IGNORECASE))
         start_idx = match.start()
+        prefix_end_idx = match.end()
         
         # Determine where this question block ends (start of the next question, or end of document)
         if i + 1 < len(matches):
@@ -43,9 +51,18 @@ def split_into_questions(full_document_text: str) -> list[dict]:
             end_idx = len(full_document_text)
             
         q_text = full_document_text[start_idx:end_idx].strip()
-        questions.append({
-            "number": q_num,
-            "question_text": q_text
-        })
+        after_prefix_text = full_document_text[prefix_end_idx:end_idx].strip()
+        has_imperative = bool(imperative_pattern.search(after_prefix_text))
+        
+        # False-positive filtering:
+        # Require an explicit question keyword (e.g. "Question 1", "Q1"),
+        # an imperative verb (e.g. "Name", "Explain", "Calculate"),
+        # OR a question mark '?' in the text.
+        # This prevents standard section headers (e.g. "1. Executive Summary") from being misidentified.
+        if has_keyword or has_imperative or "?" in q_text:
+            questions.append({
+                "number": q_num,
+                "question_text": after_prefix_text if after_prefix_text else q_text
+            })
         
     return questions
