@@ -71,18 +71,21 @@ def create_vector_store(chunks, db_directory: str = "./chroma_db"):
     print("Initializing embedding model (all-MiniLM-L6-v2)...")
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     
-    # 2. Clean up any existing vector store directory if we are doing a fresh ingestion
-    if os.path.exists(db_directory):
-        print(f"Clearing existing vector database at {db_directory}...")
-        # We use shutil.rmtree to fully remove the folder so Chroma starts clean
-        shutil.rmtree(db_directory)
+    # 2. Clean up any existing vector store collection to prevent SQLite file locks
+    import chromadb
+    client = chromadb.PersistentClient(path=db_directory)
+    try:
+        client.delete_collection("langchain")
+    except Exception:
+        pass
         
     # 3. Create the Chroma database from our document chunks
-    print(f"Creating vector database at '{db_directory}'...")
+    print(f"Creating vector database at '{db_directory}' with collection 'langchain'...")
     vector_store = Chroma.from_documents(
         documents=chunks,
         embedding=embeddings,
-        persist_directory=db_directory
+        client=client,
+        collection_name="langchain"
     )
     
     # In older LangChain versions, .persist() was required to save to disk.
