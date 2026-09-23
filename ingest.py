@@ -1,3 +1,4 @@
+from pypdf.errors import FileNotDecryptedError
 import os
 import shutil
 from langchain_community.document_loaders import PyPDFLoader
@@ -25,7 +26,15 @@ def extract_text_and_split(pdf_file_path: str):
     # Load and parse pages from the PDF file.
     # PyPDFLoader parses the PDF and creates a list of Document objects,
     # each containing page content and metadata (like page number).
-    documents = loader.load()
+    try:
+        documents = loader.load()
+    except FileNotDecryptedError as e:
+        raise ValueError("The uploaded PDF is password-protected and cannot be read without a password.") from e
+    except Exception as e:
+        if "not been decrypted" in str(e).lower():
+            raise ValueError("The uploaded PDF is password-protected and cannot be read without a password.") from e
+        raise
+
     print(f"Successfully loaded {len(documents)} pages.")
 
     # We use RecursiveCharacterTextSplitter because it splits text by trying different
@@ -42,7 +51,11 @@ def extract_text_and_split(pdf_file_path: str):
     print(f"Split pages into {len(chunks)} text chunks.")
     
     # Reconstruct the full original document text (before chunking)
-    full_text = "\n".join([doc.page_content for doc in documents])
+    full_text = "\n".join([doc.page_content for doc in documents]).strip()
+    
+    # Check for empty or scanned image PDFs
+    if not documents or not chunks or not full_text:
+        raise ValueError("No extractable text found — if this is a scanned image, please run OCR first.")
     
     return chunks, full_text
 

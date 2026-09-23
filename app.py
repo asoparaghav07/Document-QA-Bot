@@ -113,7 +113,11 @@ with st.sidebar:
             with st.spinner("⏳ Parsing PDF, splitting text, and building vector database..."):
                 try:
                     # Step A: Load and Split text
-                    chunks, full_text = extract_text_and_split(temp_file_path)
+                    try:
+                chunks, full_text = extract_text_and_split(temp_file_path)
+            except ValueError as ve:
+                st.error(f"❌ {str(ve)}")
+                st.stop()
                     
                     # Step B: Create and save vector store
                     create_vector_store(chunks, db_directory="./chroma_db")
