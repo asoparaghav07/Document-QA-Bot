@@ -112,7 +112,7 @@ if "current_file" not in st.session_state:
 if "messages" not in st.session_state:
     cur_doc_id = st.session_state.get("current_doc_id")
     db_msgs = db.get_messages(session_id, document_id=cur_doc_id)
-    st.session_state.messages = db.get_messages(session_id, document_id=cur_doc_id)
+    st.session_state.messages = list(db_msgs) if db_msgs else []
 
 if "full_document_text" not in st.session_state:
     st.session_state.full_document_text = None

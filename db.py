@@ -257,12 +257,12 @@ class DatabaseManager:
             p = "%s" if self.is_postgres else "?"
             if document_id is not None:
                 cur.execute(
-                    f"SELECT role, content FROM messages WHERE session_id = {p} AND document_id = {p} ORDER BY timestamp ASC",
+                    f"SELECT role, content FROM messages WHERE session_id = {p} AND document_id = {p} ORDER BY message_id ASC",
                     (session_id, document_id)
                 )
             else:
                 cur.execute(
-                    f"SELECT role, content FROM messages WHERE session_id = {p} ORDER BY timestamp ASC",
+                    f"SELECT role, content FROM messages WHERE session_id = {p} ORDER BY message_id ASC",
                     (session_id,)
                 )
             rows = cur.fetchall()
@@ -296,12 +296,12 @@ class DatabaseManager:
             p = "%s" if self.is_postgres else "?"
             if document_id is not None:
                 cur.execute(
-                    f"SELECT question, answer FROM solved_worksheets WHERE session_id = {p} AND document_id = {p} ORDER BY solved_at ASC",
+                    f"SELECT question, answer FROM solved_worksheets WHERE session_id = {p} AND document_id = {p} ORDER BY worksheet_id ASC",
                     (session_id, document_id)
                 )
             else:
                 cur.execute(
-                    f"SELECT question, answer FROM solved_worksheets WHERE session_id = {p} ORDER BY solved_at ASC",
+                    f"SELECT question, answer FROM solved_worksheets WHERE session_id = {p} ORDER BY worksheet_id ASC",
                     (session_id,)
                 )
             rows = cur.fetchall()
