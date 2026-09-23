@@ -26,8 +26,8 @@ def get_secret(key: str, default: str = None):
 
 # Set page configuration with a premium icon and title
 st.set_page_config(
-    page_title="Document Q&A Bot",
-    page_icon="🤖",
+    page_title="Document Q&A",
+    page_icon="📄",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -112,7 +112,7 @@ if "current_file" not in st.session_state:
 if "messages" not in st.session_state:
     cur_doc_id = st.session_state.get("current_doc_id")
     db_msgs = db.get_messages(session_id, document_id=cur_doc_id)
-    st.session_state.messages = list(db_msgs) if db_msgs else []
+    st.session_state.messages = db.get_messages(session_id, document_id=cur_doc_id)
 
 if "full_document_text" not in st.session_state:
     st.session_state.full_document_text = None
@@ -144,17 +144,73 @@ def validate_groq_key(key: str) -> bool:
     except Exception:
         return False
 
-# Inline sidebar configuration before modal refactor
-def render_sidebar_config():
-    st.markdown("### ⚙️ Configuration")
-    active_key = st.session_state.get("user_groq_api_key") or get_secret("GROQ_API_KEY")
-    entered_key = st.text_input("Groq API Key:", type="password", value=active_key if active_key else "")
-    if st.button("Save API Key"):
-        if entered_key and validate_groq_key(entered_key.strip()):
-            os.environ["GROQ_API_KEY"] = entered_key.strip()
-            st.session_state["user_groq_api_key"] = entered_key.strip()
-            st.success("Saved!")
+# ----------------- SETTINGS & ABOUT DIALOG MODAL -----------------
+@st.dialog("⚙️ Settings & System")
+def show_settings_dialog():
+    tab_api, tab_about = st.tabs(["🔑 API & Database", "ℹ️ About & Tech Stack"])
+    with tab_api:
+        st.subheader("Groq API Configuration")
+        active_key = st.session_state.get("user_groq_api_key") or get_secret("GROQ_API_KEY")
+        if active_key:
+            st.success("✅ Groq API Key is active")
+        else:
+            st.warning("🔑 Groq API Key required")
+            
+        entered_key = st.text_input(
+            "Enter or Update Groq API Key:",
+            type="password",
+            value=active_key if active_key else "",
+            help="Get a free key from console.groq.com"
+        )
+        if st.button("Save & Verify API Key", use_container_width=True):
+            if entered_key:
+                entered_key = entered_key.strip()
+                if validate_groq_key(entered_key):
+                    os.environ["GROQ_API_KEY"] = entered_key
+                    st.session_state["user_groq_api_key"] = entered_key
+                    st.success("✅ API key verified and updated!")
+                    st.rerun()
+                else:
+                    st.error("❌ Invalid Groq API key.")
+
+        st.markdown("---")
+        st.subheader("Session Data Management")
+        st.caption("Clears all ChromaDB vector collections, chat messages, and worksheet results for this session.")
+        if st.button("🗑️ Reset Session Vector Database", type="secondary", use_container_width=True):
+            try:
+                import chromadb
+                client = chromadb.PersistentClient(path="./chroma_db")
+                for col in client.list_collections():
+                    col_name = getattr(col, "name", str(col))
+                    if col_name.startswith(f"doc_{session_id}"):
+                        client.delete_collection(col_name)
+            except Exception:
+                pass
+            db.clear_session_data(session_id)
+            st.session_state.vector_store = None
+            st.session_state.current_file = None
+            st.session_state.current_doc_id = None
+            st.session_state.full_document_text = None
+            st.session_state.solved_results = None
+            st.session_state.detected_questions = None
+            st.session_state.messages = []
+            st.session_state.last_uploaded_filename = None
+            st.session_state.target_tab = "💬 Chat with Document"
             st.rerun()
+
+    with tab_about:
+        st.subheader("System Architecture")
+        st.markdown(
+            "**Document Q&A Bot** is engineered for high-precision Retrieval-Augmented Generation (RAG) "
+            "with multi-document session persistence.\n\n"
+            "**Core Tech Stack:**\n"
+            "- **Frontend:** Streamlit 1.59 UI with clean collapsible chat architecture\n"
+            "- **Document Ingestion:** PyPDF & LangChain RecursiveCharacterTextSplitter\n"
+            "- **Vector Database:** ChromaDB with dual session- & document-scoped collections\n"
+            "- **Embeddings:** Local HuggingFace `all-MiniLM-L6-v2` (on-device vectorization)\n"
+            "- **LLM Engine:** Groq Cloud Llama 3.3 (`openai/gpt-oss-20b`) with deterministic temperature=0.0\n"
+            "- **Database Storage:** Supabase (PostgreSQL) with SQLite local fallback"
+        )
 
 # ----------------- SIDEBAR CONTENT -----------------
 with st.sidebar:
