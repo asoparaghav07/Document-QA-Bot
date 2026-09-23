@@ -106,9 +106,10 @@ def generate_answer(query: str, retrieved_docs):
     # We use llama-3.3-70b-versatile, which is highly capable and fast.
     # We set temperature=0.0 to make the output deterministic and factual (reducing creative hallucination).
     try:
+        model_name = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
         llm = ChatGroq(
             groq_api_key=api_key,
-            model_name="llama-3.3-70b-versatile",
+            model_name=model_name,
             temperature=0.0
         )
         
@@ -124,6 +125,13 @@ def generate_answer(query: str, retrieved_docs):
             return (
                 "⚠️ **Rate Limit Exceeded (Groq API):** You have exceeded the free tier rate limit "
                 "(30 requests/minute or 6,000 tokens/minute). Please wait 10-15 seconds and try asking again.",
+                retrieved_docs
+            )
+        # Handle model not found (404)
+        elif "model_not_found" in error_msg or "does not exist" in error_msg or "404" in error_msg:
+            return (
+                f"⚠️ **Model Not Found Error:** The configured model `{model_name}` does not exist or is not available on Groq. "
+                "Please check the `GROQ_MODEL` setting in your `.env` file (e.g., `openai/gpt-oss-20b`).",
                 retrieved_docs
             )
         # Handle other API/authentication issues
