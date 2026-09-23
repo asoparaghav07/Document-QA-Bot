@@ -51,6 +51,8 @@ def extract_text_and_split(pdf_file_path: str):
         raise
 
     print(f"Successfully loaded {len(documents)} pages.")
+    if len(documents) > 200:
+        raise ValueError(f"Document exceeds the maximum limit of 200 pages (found {len(documents)} pages).")
 
     # We use RecursiveCharacterTextSplitter because it splits text by trying different
     # separators in order (like double newlines, single newlines, spaces) to keep 

@@ -193,7 +193,17 @@ else:
                             )
 
         # 3. Chat Input Box
+        # Session-based rate limit: 20 questions per hour
+        if "question_timestamps" not in st.session_state:
+            st.session_state.question_timestamps = []
+
         if user_query := st.chat_input("Ask a question about the document:"):
+            now = time.time()
+            st.session_state.question_timestamps = [t for t in st.session_state.question_timestamps if now - t < 3600]
+            if len(st.session_state.question_timestamps) >= 20:
+                st.error("⚠️ Rate limit reached: Maximum 20 questions per hour per session. Please wait before asking again.")
+                st.stop()
+            st.session_state.question_timestamps.append(now)
             # Display the user's message in the chat
             st.session_state.messages.append({"role": "user", "content": user_query})
             with st.chat_message("user"):
