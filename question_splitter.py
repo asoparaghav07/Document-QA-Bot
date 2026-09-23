@@ -19,8 +19,7 @@ def split_into_questions(full_document_text: str) -> list[dict]:
         return []
         
     # Pattern to detect numbered questions:
-    # - (?:^|
-): Start of the text or start of a new line
+    # - (?:^|\n): Start of the text or start of a new line
     # - \s*: Optional leading whitespace
     # - Group 1: Entire prefix including optional question keyword and number
     # - Group 2: The question digits
@@ -60,9 +59,12 @@ def split_into_questions(full_document_text: str) -> list[dict]:
         # OR a question mark '?' in the text.
         # This prevents standard section headers (e.g. "1. Executive Summary") from being misidentified.
         if has_keyword or has_imperative or "?" in q_text:
+            final_q_text = after_prefix_text if after_prefix_text else q_text
+            if "?" in final_q_text:
+                final_q_text = final_q_text[:final_q_text.find("?") + 1].strip()
             questions.append({
                 "number": q_num,
-                "question_text": after_prefix_text if after_prefix_text else q_text
+                "question_text": final_q_text
             })
         
     return questions
