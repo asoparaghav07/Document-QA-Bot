@@ -113,9 +113,12 @@ def generate_answer(query: str, retrieved_docs):
             temperature=0.0
         )
         
-        # Format and run the chain
-        formatted_messages = prompt.format_messages(question=query)
-        response = llm.invoke(formatted_messages)
+        # Direct message construction avoids format-string parsing bugs when documents contain curly braces ({, })
+        messages = [
+            SystemMessage(content=system_instruction),
+            HumanMessage(content=query)
+        ]
+        response = llm.invoke(messages)
         return response.content, retrieved_docs
         
     except Exception as e:
