@@ -1,34 +1,38 @@
-from dotenv import load_dotenv
-import chromadb
 import os
 import time
+from dotenv import load_dotenv
+import chromadb
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import SystemMessage, HumanMessage
 from ingest import get_embedding_model
 
 # Load environment variables from .env file so retrieval.py works standalone
 load_dotenv()
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import SystemMessage, HumanMessage
 
-def load_vector_store(db_directory: str = "./chroma_db", embeddings=None):
+def load_vector_store(db_directory: str = "./chroma_db", embeddings=None, session_id: str = None, document_id: int = None):
     """
-    Loads the persisted Chroma vector database from disk.
-    
-    Why we do this:
-    Instead of recreating the database every time the user asks a question, we load
-    the existing database from the disk, saving time and computation.
+    Loads the persisted Chroma vector database from disk using cached embeddings.
+    Scopes retrieval to session_id and document_id collection if provided.
     """
     if not os.path.exists(db_directory):
         return None
         
     if embeddings is None:
         embeddings = get_embedding_model()
+
+    if session_id and document_id:
+        collection_name = f"doc_{session_id}_{document_id}"
+    elif session_id:
+        collection_name = f"doc_{session_id}"
+    else:
+        collection_name = "langchain"
     client = chromadb.PersistentClient(path=db_directory)
     vector_store = Chroma(
         client=client,
-        collection_name="langchain",
+        collection_name=collection_name,
         embedding_function=embeddings
     )
     return vector_store
@@ -54,6 +58,16 @@ def retrieve_relevant_chunks(query: str, vector_store, k: int = 3):
     return docs
 
 
+def get_secret(key: str, default: str = None):
+    try:
+        import streamlit as st
+        if key in st.secrets:
+            return str(st.secrets[key])
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
+
 def generate_answer(query: str, retrieved_docs):
     """
     Step 5: Send the retrieved context chunks and the user's question to Groq LLM.
@@ -68,10 +82,10 @@ def generate_answer(query: str, retrieved_docs):
     errors gracefully if the limits are exceeded, explaining how to resolve it.
     """
     # 1. Check if the Groq API key is set
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = get_secret("GROQ_API_KEY")
     if not api_key:
         return (
-            "Error: GROQ_API_KEY environment variable is not set. Please add it to your .env file.",
+            "Error: GROQ_API_KEY is not set. Please enter your Groq API key in the sidebar or configure it in secrets.",
             []
         )
     
@@ -105,17 +119,12 @@ def generate_answer(query: str, retrieved_docs):
         f"{context_text}\n"
         "--- END CONTEXT ---"
     )
-    
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_instruction),
-        ("human", "{question}")
-    ])
-    
+
     # 4. Initialize the Groq Chat model
-    # We use llama-3.3-70b-versatile, which is highly capable and fast.
+    # We default to openai/gpt-oss-20b, configurable via the GROQ_MODEL environment variable.
     # We set temperature=0.0 to make the output deterministic and factual (reducing creative hallucination).
+    model_name = get_secret("GROQ_MODEL", "openai/gpt-oss-20b")
     try:
-        model_name = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
         llm = ChatGroq(
             groq_api_key=api_key,
             model_name=model_name,
@@ -150,7 +159,7 @@ def generate_answer(query: str, retrieved_docs):
         elif "authentication" in error_msg or "api key" in error_msg or "unauthorized" in error_msg:
             return (
                 "⚠️ **API Key Error:** The provided Groq API key is invalid or unauthorized. "
-                "Please verify your `.env` file credentials.",
+                "Please verify your key in the sidebar settings or `.env` file credentials.",
                 []
             )
         else:

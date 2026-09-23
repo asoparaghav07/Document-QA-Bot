@@ -1,9 +1,9 @@
-from pypdf.errors import FileNotDecryptedError
 import os
 import shutil
+from pypdf.errors import FileNotDecryptedError
+import streamlit as st
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-import streamlit as st
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
@@ -77,47 +77,38 @@ def extract_text_and_split(pdf_file_path: str):
     return chunks, full_text
 
 
-def create_vector_store(chunks, db_directory: str = "./chroma_db", embeddings=None):
+def create_vector_store(chunks, db_directory: str = "./chroma_db", embeddings=None, session_id: str = None, document_id: int = None):
     """
     Step 3: Convert text chunks into vector embeddings and store them in a local ChromaDB database.
-    
-    Why Embeddings?
-    Computers cannot understand the raw meaning of words, but they can understand numbers. 
-    An embedding model converts a text chunk into a high-dimensional vector (a list of numbers) 
-    representing its semantic meaning. If two text chunks talk about similar topics, 
-    their vectors will be close together in space.
-    
-    Why the Embedding Model ('all-MiniLM-L6-v2')?
-    We use Hugging Face's 'all-MiniLM-L6-v2' model because it runs entirely locally on your machine 
-    for free. It is fast, lightweight, and very effective for semantic search tasks.
-    
-    Why a Vector Database (ChromaDB)?
-    Standard databases query text by exact keyword matches. Vector databases store text along with 
-    their numerical embeddings. This allows us to perform "Similarity Search", finding chunks 
-    that mean something similar to a user's question, even if they use completely different words!
+    Per-user isolation is enforced by scoping the Chroma collection name to both session_id and document_id.
     """
     # 1. Fetch the cached embedding model
     if embeddings is None:
         embeddings = get_embedding_model()
     
-    # 2. Clean up any existing vector store collection to prevent SQLite file locks
+    if session_id and document_id:
+        collection_name = f"doc_{session_id}_{document_id}"
+    elif session_id:
+        collection_name = f"doc_{session_id}"
+    else:
+        collection_name = "langchain"
+
+    # 2. Clean up any existing vector store collection for this session
     import chromadb
     client = chromadb.PersistentClient(path=db_directory)
     try:
-        client.delete_collection("langchain")
+        client.delete_collection(collection_name)
     except Exception:
         pass
         
     # 3. Create the Chroma database from our document chunks
-    print(f"Creating vector database at '{db_directory}' with collection 'langchain'...")
+    print(f"Creating vector database at '{db_directory}' with collection '{collection_name}'...")
     vector_store = Chroma.from_documents(
         documents=chunks,
         embedding=embeddings,
         client=client,
-        collection_name="langchain"
+        collection_name=collection_name
     )
     
-    # In older LangChain versions, .persist() was required to save to disk.
-    # In newer versions of Chroma, saving is done automatically.
     print("Vector database successfully built and saved to disk.")
     return vector_store
